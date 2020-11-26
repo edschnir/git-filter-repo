@@ -1189,13 +1189,14 @@ class FastExportParser(object):
       original_id = self._parse_original_id();
 
     author_name = None
+    author_email = None
     if self._currentline.startswith(b'author'):
       (author_name, author_email, author_date) = self._parse_user(b'author')
 
     (committer_name, committer_email, committer_date) = \
       self._parse_user(b'committer')
 
-    if not author_name:
+    if not author_name and not author_email:
       (author_name, author_email, author_date) = \
         (committer_name, committer_email, committer_date)
 
@@ -1314,6 +1315,8 @@ class FastExportParser(object):
       if not tag.dumped:
         self._imported_refs.add(b'refs/tags/'+tag.ref)
         tag.dump(self._output)
+    else:
+      tag.skip()
 
   def _parse_progress(self):
     """
@@ -3191,7 +3194,10 @@ class RepoFilter(object):
     for change in commit.file_changes:
       parent = new_1st_parent or commit.parents[0] # exists due to above checks
       quoted_filename = PathQuoting.enquote(change.filename)
-      self._output.write(b"ls :%d %s\n" % (parent, quoted_filename))
+      if isinstance(parent, int):
+        self._output.write(b"ls :%d %s\n" % (parent, quoted_filename))
+      else:
+        self._output.write(b"ls %s %s\n" % (parent, quoted_filename))
       self._output.flush()
       parent_version = fi_output.readline().split()
       if change.type == b'D':
@@ -3516,7 +3522,7 @@ class RepoFilter(object):
         contents = subproc.check_output(cmd)
       except subprocess.CalledProcessError as e: # pragma: no cover
         raise SystemExit(_("Failed loading %s from %s") %
-                         (decode(marks_basename), branch))
+                         (decode(marks_basename), full_branch))
     if contents:
       biggest_id = max(int(x.split()[0][1:]) for x in contents.splitlines())
       _IDS._next_id = max(_IDS._next_id, biggest_id+1)
